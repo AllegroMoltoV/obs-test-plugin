@@ -54,21 +54,17 @@ endif()
 
 # 以降は、PLUGIN_SOURCES を target_sources() または add_library() に渡す
 
-file(GLOB_RECURSE PLUGIN_RESOURCES CONFIGURE_DEPENDS
+file(
+  GLOB_RECURSE PLUGIN_RESOURCES
+  CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/data/*.effect"
   "${CMAKE_CURRENT_SOURCE_DIR}/data/locale/*.ini"
 )
 
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-  ${PLUGIN_SOURCES}
-  ${PLUGIN_RESOURCES}
-)
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${PLUGIN_SOURCES} ${PLUGIN_RESOURCES})
 
 # Solution Explorer のツリー表示を実ディレクトリに揃える
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
-  ${PLUGIN_SOURCES}
-  ${PLUGIN_RESOURCES}
-)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PLUGIN_SOURCES} ${PLUGIN_RESOURCES})
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
