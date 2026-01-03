@@ -51,7 +51,7 @@ public:
 
 	void Render()
 	{
-		if (!effect_) {
+		if (!effect_ || !param_tint_color_ || !param_strength_) {
 			obs_source_skip_video_filter(context_);
 			return;
 		}
@@ -62,7 +62,6 @@ public:
 
 		gs_effect_set_vec4(param_tint_color_, &tint_color_);
 		gs_effect_set_float(param_strength_, strength_);
-
 		obs_source_process_filter_end(context_, effect_, 0, 0);
 	}
 

@@ -36,11 +36,14 @@ if(ENABLE_QT)
   )
 endif()
 
-# src/ と data/ を自動で拾う (追加のたびに CMakeLists.txt を編集しないため)
 file(GLOB PLUGIN_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
+
+if(NOT ENABLE_QT)
+  list(FILTER PLUGIN_SOURCES EXCLUDE REGEX ".*/qt-tools\\.cpp$")
+endif()
 
 file(GLOB_RECURSE PLUGIN_RESOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/data/*.effect"
