@@ -36,14 +36,23 @@ if(ENABLE_QT)
   )
 endif()
 
-file(GLOB PLUGIN_SOURCES CONFIGURE_DEPENDS
+file(
+  GLOB PLUGIN_SOURCES
+  CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-if(NOT ENABLE_QT)
-  list(FILTER PLUGIN_SOURCES EXCLUDE REGEX ".*/qt-tools\\.cpp$")
+# Qt の有無で差し替えるため、GLOB には含めない
+list(FILTER PLUGIN_SOURCES EXCLUDE REGEX ".*/qt-tools(-stub)?\\.cpp$")
+
+if(ENABLE_QT AND ENABLE_FRONTEND_API)
+  list(APPEND PLUGIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/qt-tools.cpp")
+else()
+  list(APPEND PLUGIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/qt-tools-stub.cpp")
 endif()
+
+# 以降は、PLUGIN_SOURCES を target_sources() または add_library() に渡す
 
 file(GLOB_RECURSE PLUGIN_RESOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/data/*.effect"
