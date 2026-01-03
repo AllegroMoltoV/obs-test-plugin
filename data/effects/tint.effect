@@ -1,0 +1,43 @@
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float4 tint_color = {1.0, 0.5, 0.5, 1.0};
+uniform float strength = 0.35;
+
+sampler_state defaultSampler {
+    Filter   = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+};
+
+struct VertInOut {
+    float4 pos : POSITION;
+    float2 uv  : TEXCOORD0;
+};
+
+VertInOut VSDefault(VertInOut v_in)
+{
+    VertInOut v_out;
+    v_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+    v_out.uv  = v_in.uv;
+    return v_out;
+}
+
+float4 PSTint(VertInOut v_in) : TARGET
+{
+    float4 c = image.Sample(defaultSampler, v_in.uv);
+
+    float3 tinted = c.rgb * tint_color.rgb;
+    c.rgb = lerp(c.rgb, tinted, strength);
+
+    return c;
+}
+
+technique Draw
+{
+    pass
+    {
+        vertex_shader = VSDefault(v_in);
+        pixel_shader  = PSTint(v_in);
+    }
+}
