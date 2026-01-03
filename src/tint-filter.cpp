@@ -1,112 +1,122 @@
 #include <obs-module.h>
 #include <graphics/effect.h>
 
-struct tint_filter_data {
-	obs_source_t *context;
+#include <new>
 
-	gs_effect_t *effect;
-	gs_eparam_t *param_tint_color;
-	gs_eparam_t *param_strength;
+class TintFilter final {
+public:
+	TintFilter(obs_data_t *settings, obs_source_t *source) : context_(source)
+	{
+		obs_enter_graphics();
 
-	struct vec4 tint_color;
-	float strength;
-};
+		char *path = obs_module_file("effects/tint.effect");
+		effect_ = gs_effect_create_from_file(path, nullptr);
+		bfree(path);
 
-static const char *tint_filter_get_name(void *unused)
-{
-	UNUSED_PARAMETER(unused);
-	return obs_module_text("TintFilterName");
-}
+		if (effect_) {
+			param_tint_color_ = gs_effect_get_param_by_name(effect_, "tint_color");
+			param_strength_ = gs_effect_get_param_by_name(effect_, "strength");
+		}
 
-static void tint_filter_update(void *data, obs_data_t *settings)
-{
-	struct tint_filter_data *f = data;
+		obs_leave_graphics();
 
-	uint32_t rgba = (uint32_t)obs_data_get_int(settings, "tint_color");
-	vec4_from_rgba(&f->tint_color, rgba);
-
-	f->strength = (float)obs_data_get_double(settings, "strength");
-}
-
-static obs_properties_t *tint_filter_properties(void *unused)
-{
-	UNUSED_PARAMETER(unused);
-
-	obs_properties_t *props = obs_properties_create();
-	obs_properties_add_color(props, "tint_color", obs_module_text("TintColor"));
-	obs_properties_add_float_slider(props, "strength", obs_module_text("Strength"), 0.0, 1.0, 0.01);
-
-	return props;
-}
-
-static void *tint_filter_create(obs_data_t *settings, obs_source_t *source)
-{
-	struct tint_filter_data *f = bzalloc(sizeof(*f));
-	f->context = source;
-
-	obs_enter_graphics();
-
-	char *path = obs_module_file("effects/tint.effect");
-	f->effect = gs_effect_create_from_file(path, NULL);
-	bfree(path);
-
-	if (f->effect) {
-		f->param_tint_color = gs_effect_get_param_by_name(f->effect, "tint_color");
-		f->param_strength = gs_effect_get_param_by_name(f->effect, "strength");
+		Update(settings);
 	}
 
-	obs_leave_graphics();
-
-	tint_filter_update(f, settings);
-	return f;
-}
-
-static void tint_filter_destroy(void *data)
-{
-	struct tint_filter_data *f = data;
-
-	obs_enter_graphics();
-	if (f->effect) {
-		gs_effect_destroy(f->effect);
-	}
-	obs_leave_graphics();
-
-	bfree(f);
-}
-
-static void tint_filter_render(void *data, gs_effect_t *unused)
-{
-	UNUSED_PARAMETER(unused);
-	struct tint_filter_data *f = data;
-
-	if (!f->effect) {
-		obs_source_skip_video_filter(f->context);
-		return;
+	~TintFilter()
+	{
+		obs_enter_graphics();
+		if (effect_) {
+			gs_effect_destroy(effect_);
+			effect_ = nullptr;
+		}
+		obs_leave_graphics();
 	}
 
-	if (!obs_source_process_filter_begin(f->context, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING)) {
-		return;
+	void Update(obs_data_t *settings)
+	{
+		const uint32_t rgba = static_cast<uint32_t>(obs_data_get_int(settings, "tint_color"));
+		vec4_from_rgba(&tint_color_, rgba);
+
+		strength_ = static_cast<float>(obs_data_get_double(settings, "strength"));
 	}
 
-	gs_effect_set_vec4(f->param_tint_color, &f->tint_color);
-	gs_effect_set_float(f->param_strength, f->strength);
+	void Render()
+	{
+		if (!effect_) {
+			obs_source_skip_video_filter(context_);
+			return;
+		}
 
-	obs_source_process_filter_end(f->context, f->effect, 0, 0);
-}
+		if (!obs_source_process_filter_begin(context_, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING)) {
+			return;
+		}
 
-static struct obs_source_info tint_filter_info = {
-	.id = "tint_filter",
-	.type = OBS_SOURCE_TYPE_FILTER,
-	.output_flags = OBS_SOURCE_VIDEO,
-	.get_name = tint_filter_get_name,
-	.create = tint_filter_create,
-	.destroy = tint_filter_destroy,
-	.update = tint_filter_update,
-	.get_properties = tint_filter_properties,
-	.video_render = tint_filter_render,
+		gs_effect_set_vec4(param_tint_color_, &tint_color_);
+		gs_effect_set_float(param_strength_, strength_);
+
+		obs_source_process_filter_end(context_, effect_, 0, 0);
+	}
+
+	static const char *GetName(void *unused)
+	{
+		UNUSED_PARAMETER(unused);
+		return obs_module_text("TintFilterName");
+	}
+
+	static void *Create(obs_data_t *settings, obs_source_t *source)
+	{
+		return new (std::nothrow) TintFilter(settings, source);
+	}
+
+	static void Destroy(void *data) { delete static_cast<TintFilter *>(data); }
+
+	static void UpdateCallback(void *data, obs_data_t *settings)
+	{
+		static_cast<TintFilter *>(data)->Update(settings);
+	}
+
+	static obs_properties_t *Properties(void *unused)
+	{
+		UNUSED_PARAMETER(unused);
+
+		obs_properties_t *props = obs_properties_create();
+		obs_properties_add_color(props, "tint_color", obs_module_text("TintColor"));
+		obs_properties_add_float_slider(props, "strength", obs_module_text("Strength"), 0.0, 1.0, 0.01);
+		return props;
+	}
+
+	static void VideoRender(void *data, gs_effect_t *unused)
+	{
+		UNUSED_PARAMETER(unused);
+		static_cast<TintFilter *>(data)->Render();
+	}
+
+private:
+	obs_source_t *context_ = nullptr;
+
+	gs_effect_t *effect_ = nullptr;
+	gs_eparam_t *param_tint_color_ = nullptr;
+	gs_eparam_t *param_strength_ = nullptr;
+
+	struct vec4 tint_color_ = {};
+	float strength_ = 0.35f;
 };
 
 void register_tint_filter(void)
 {
-	obs_register_source(&tint_filter_info);
+	static obs_source_info info = {};
+
+	info.id = "tint_filter";
+	info.type = OBS_SOURCE_TYPE_FILTER;
+	info.output_flags = OBS_SOURCE_VIDEO;
+
+	info.get_name = TintFilter::GetName;
+	info.create = TintFilter::Create;
+	info.destroy = TintFilter::Destroy;
+	info.update = TintFilter::UpdateCallback;
+	info.get_properties = TintFilter::Properties;
+	info.video_render = TintFilter::VideoRender;
+
+	obs_register_source(&info);
 }
