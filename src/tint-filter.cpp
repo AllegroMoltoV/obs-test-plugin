@@ -1,6 +1,8 @@
 #include <obs-module.h>
+#include <plugin-support.h>
 #include <graphics/effect.h>
 
+#include <cstdint>
 #include <new>
 
 class TintFilter final {
@@ -10,12 +12,18 @@ public:
 		obs_enter_graphics();
 
 		char *path = obs_module_file("effects/tint.effect");
-		effect_ = gs_effect_create_from_file(path, nullptr);
-		bfree(path);
+		if (path) {
+			effect_ = gs_effect_create_from_file(path, nullptr);
+			bfree(path);
+		} else {
+			obs_log(LOG_WARNING, "[tint_filter] obs_module_file() failed: effects/tint.effect");
+		}
 
 		if (effect_) {
 			param_tint_color_ = gs_effect_get_param_by_name(effect_, "tint_color");
 			param_strength_ = gs_effect_get_param_by_name(effect_, "strength");
+		} else {
+			obs_log(LOG_WARNING, "[tint_filter] Failed to load effect: effects/tint.effect");
 		}
 
 		obs_leave_graphics();
@@ -35,7 +43,7 @@ public:
 
 	void Update(obs_data_t *settings)
 	{
-		const uint32_t rgba = static_cast<uint32_t>(obs_data_get_int(settings, "tint_color"));
+		const std::uint32_t rgba = static_cast<std::uint32_t>(obs_data_get_int(settings, "tint_color"));
 		vec4_from_rgba(&tint_color_, rgba);
 
 		strength_ = static_cast<float>(obs_data_get_double(settings, "strength"));
